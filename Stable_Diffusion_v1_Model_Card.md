@@ -1,135 +1,77 @@
-# Stable Diffusion v1 Model Card
-This model card focuses on the model associated with the Stable Diffusion model, available [here](https://github.com/CompVis/stable-diffusion).
+# Stable Diffusion v1 Running with 6G GPU Memory
+This project is forked from https://github.com/CompVis/stable-diffusion, and aim to run text to image generator in a 6G memory GPU. 
 
-## Model Details
-- **Developed by:** Robin Rombach, Patrick Esser
-- **Model type:** Diffusion-based text-to-image generation model
-- **Language(s):** English
-- **License:** [Proprietary](LICENSE)
-- **Model Description:** This is a model that can be used to generate and modify images based on text prompts. It is a [Latent Diffusion Model](https://arxiv.org/abs/2112.10752) that uses a fixed, pretrained text encoder ([CLIP ViT-L/14](https://arxiv.org/abs/2103.00020)) as suggested in the [Imagen paper](https://arxiv.org/abs/2205.11487).
-- **Resources for more information:** [GitHub Repository](https://github.com/CompVis/stable-diffusion), [Paper](https://arxiv.org/abs/2112.10752).
-- **Cite as:**
+Stable diffusion for text to image generator contain 3 models:
 
-      @InProceedings{Rombach_2022_CVPR,
-          author    = {Rombach, Robin and Blattmann, Andreas and Lorenz, Dominik and Esser, Patrick and Ommer, Bj\"orn},
-          title     = {High-Resolution Image Synthesis With Latent Diffusion Models},
-          booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-          month     = {June},
-          year      = {2022},
-          pages     = {10684-10695}
-      }
+1. CLIP text encoder: embed the input text prompt into condition c
 
-# Uses
+2. U-Net: generate a small size image by DDPM, typically 64 × 64, or 96 × 64
 
-## Direct Use 
-The model is intended for research purposes only. Possible research areas and
-tasks include
+3. Upsampling decoder: upsample the small size image to a large size image, typically by factor of 8
 
-- Safe deployment of models which have the potential to generate harmful content.
-- Probing and understanding the limitations and biases of generative models.
-- Generation of artworks and use in design and other artistic processes.
-- Applications in educational or creative tools.
-- Research on generative models.
+To minimize the GPU memory cost and improve efficiency, there are several updates:
 
-Excluded uses are described below.
-
- ### Misuse, Malicious Use, and Out-of-Scope Use
-_Note: This section is taken from the [DALLE-MINI model card](https://huggingface.co/dalle-mini/dalle-mini), but applies in the same way to Stable Diffusion v1_.
-
-The model should not be used to intentionally create or disseminate images that create hostile or alienating environments for people. This includes generating images that people would foreseeably find disturbing, distressing, or offensive; or content that propagates historical or current stereotypes.
-
-#### Out-of-Scope Use
-The model was not trained to be factual or true representations of people or events, and therefore using the model to generate such content is out-of-scope for the abilities of this model.
-
-#### Misuse and Malicious Use
-Using the model to generate content that is cruel to individuals is a misuse of this model. This includes, but is not limited to:
-
-- Generating demeaning, dehumanizing, or otherwise harmful representations of people or their environments, cultures, religions, etc.
-- Intentionally promoting or propagating discriminatory content or harmful stereotypes.
-- Impersonating individuals without their consent.
-- Sexual content without consent of the people who might see it.
-- Mis- and disinformation
-- Representations of egregious violence and gore
-- Sharing of copyrighted or licensed material in violation of its terms of use.
-- Sharing content that is an alteration of copyrighted or licensed material in violation of its terms of use.
-
-## Limitations and Bias
-
-### Limitations
-
-- The model does not achieve perfect photorealism
-- The model cannot render legible text
-- The model does not perform well on more difficult tasks which involve compositionality, such as rendering an image corresponding to “A red cube on top of a blue sphere”
-- Faces and people in general may not be generated properly.
-- The model was trained mainly with English captions and will not work as well in other languages.
-- The autoencoding part of the model is lossy
-- The model was trained on a large-scale dataset
-  [LAION-5B](https://laion.ai/blog/laion-5b/) which contains adult material
-  and is not fit for product use without additional safety mechanisms and
-  considerations.
-- No additional measures were used to deduplicate the dataset. As a result, we observe some degree of memorization for images that are duplicated in the training data.
-  The training data can be searched at [https://rom1504.github.io/clip-retrieval/](https://rom1504.github.io/clip-retrieval/) to possibly assist in the detection of memorized images.
-
-### Bias
-While the capabilities of image generation models are impressive, they can also reinforce or exacerbate social biases. 
-Stable Diffusion v1 was primarily trained on subsets of [LAION-2B(en)](https://laion.ai/blog/laion-5b/), 
-which consists of images that are limited to English descriptions. 
-Texts and images from communities and cultures that use other languages are likely to be insufficiently accounted for. 
-This affects the overall output of the model, as white and western cultures are often set as the default. Further, the 
-ability of the model to generate content with non-English prompts is significantly worse than with English-language prompts.
-Stable Diffusion v1 mirrors and exacerbates biases to such a degree that viewer discretion must be advised irrespective of the input or its intent.
+1. Cache the condition c for the same prompt: Only use CLIP text encoder for the first time of using the prompt, and then cache it into the file system. Each prompt cache takes 232 KB.
+2. Load the model and data to CUDA only when used. After using the model, remove it from CUDA.
+3. Use half-precision for U-Net (diffusion part)
 
 
-## Training
 
-**Training Data**
-The model developers used the following dataset for training the model:
+## How to use?
 
-- LAION-5B and subsets thereof (see next section)
+1. System environment recommendation: git, anaconda, vscode
 
-**Training Procedure**
-Stable Diffusion v1 is a latent diffusion model which combines an autoencoder with a diffusion model that is trained in the latent space of the autoencoder. During training, 
+2. Download this version of stable diffusion by:
 
-- Images are encoded through an encoder, which turns images into latent representations. The autoencoder uses a relative downsampling factor of 8 and maps images of shape H x W x 3 to latents of shape H/f x W/f x 4
-- Text prompts are encoded through a ViT-L/14 text-encoder.
-- The non-pooled output of the text encoder is fed into the UNet backbone of the latent diffusion model via cross-attention.
-- The loss is a reconstruction objective between the noise that was added to the latent and the prediction made by the UNet.
+   ```
+   git clone https://github.com/Jingxiang-Zhang/stable-diffusion-running-with-6G-GPUmemory.git
+   ```
 
-We currently provide the following checkpoints:
+3. Create a conda environment by:
 
-- `sd-v1-1.ckpt`: 237k steps at resolution `256x256` on [laion2B-en](https://huggingface.co/datasets/laion/laion2B-en).
-  194k steps at resolution `512x512` on [laion-high-resolution](https://huggingface.co/datasets/laion/laion-high-resolution) (170M examples from LAION-5B with resolution `>= 1024x1024`).
-- `sd-v1-2.ckpt`: Resumed from `sd-v1-1.ckpt`.
-  515k steps at resolution `512x512` on [laion-aesthetics v2 5+](https://laion.ai/blog/laion-aesthetics/) (a subset of laion2B-en with estimated aesthetics score `> 5.0`, and additionally
-filtered to images with an original size `>= 512x512`, and an estimated watermark probability `< 0.5`. The watermark estimate is from the [LAION-5B](https://laion.ai/blog/laion-5b/) metadata, the aesthetics score is estimated using the [LAION-Aesthetics Predictor V2](https://github.com/christophschuhmann/improved-aesthetic-predictor)).
-- `sd-v1-3.ckpt`: Resumed from `sd-v1-2.ckpt`. 195k steps at resolution `512x512` on "laion-aesthetics v2 5+" and 10\% dropping of the text-conditioning to improve [classifier-free guidance sampling](https://arxiv.org/abs/2207.12598).
-- `sd-v1-4.ckpt`: Resumed from `sd-v1-2.ckpt`. 225k steps at resolution `512x512` on "laion-aesthetics v2 5+" and 10\% dropping of the text-conditioning to improve [classifier-free guidance sampling](https://arxiv.org/abs/2207.12598).
+   ```
+   conda env create -f environment.yaml
+   conda activate ldm
+   ```
 
-- **Hardware:** 32 x 8 x A100 GPUs
-- **Optimizer:** AdamW
-- **Gradient Accumulations**: 2
-- **Batch:** 32 x 8 x 2 x 4 = 2048
-- **Learning rate:** warmup to 0.0001 for 10,000 steps and then kept constant
+4. Similar to stable diffusion, you need to download pretrained weight from Hugging Face: [link](https://huggingface.co/CompVis), please use  stable-diffusion-v-1-4-original version without full-ema (which is much larger). Or, click [download v1.4](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt?download=true) to start.
 
-## Evaluation Results 
-Evaluations with different classifier-free guidance scales (1.5, 2.0, 3.0, 4.0,
-5.0, 6.0, 7.0, 8.0) and 50 PLMS sampling
-steps show the relative improvements of the checkpoints:
+5. Run the test scenario:
 
-![pareto](assets/v1-variants-scores.jpg) 
+   ```
+   python scripts/mytxt2img.py --prompt "a photograph of an astronaut riding a horse" --outdir "outputs/txt2img" --W 512 --H 768
+   ```
 
-Evaluated using 50 PLMS steps and 10000 random prompts from the COCO2017 validation set, evaluated at 512x512 resolution.  Not optimized for FID scores.
+Mind that in the first time, this project need to download CLIP model in C:\Users\username\\.cache\huggingface\transformers, which is slow.
 
-## Environmental Impact
+Limitations:
 
-**Stable Diffusion v1** **Estimated Emissions**
-Based on that information, we estimate the following CO2 emissions using the [Machine Learning Impact calculator](https://mlco2.github.io/impact#compute) presented in [Lacoste et al. (2019)](https://arxiv.org/abs/1910.09700). The hardware, runtime, cloud provider, and compute region were utilized to estimate the carbon impact.
+1. Currently only support DDIM sampler. use `--plms` will cause errors.
+2. Currently only support text to image generation.
 
-- **Hardware Type:** A100 PCIe 40GB
-- **Hours used:** 150000
-- **Cloud Provider:** AWS
-- **Compute Region:** US-east
-- **Carbon Emitted (Power consumption x Time x Carbon produced based on location of power grid):** 11250 kg CO2 eq.
+Caveats:
+
+1. The output shape of DDPM is (H/f, W/f), the maximum size that 6G memory GPU can support is (96, 64), which means by default f = 8, the maximum output image is (768, 512)
+
+
+
+## Update details
+
+1. mytxt2img.py script in /scripts/ folder
+
+2. /ldm/modules/diffusionmodules/util.py, line 261, `forward(x.float())` -> `forward(x)`. x.float() will convert the data into float32 type, but the type of our input x and model is float16.
+3. /ldm/modules/diffusionmodules/openaimodel.py, line 725, append `t_emb = t_emb.half()`. The default time embedding value is float32, we need to convert it to float16.
+4. /ldm/modules/diffusionmodules/openaimodel.py, line 732, `h = x.type(self.dtype)` -> `h = x.type(torch.float16)`.
+5. /ldm/models/diffusion/ddpm.py:
+   - Line 437: append `init_cond_stage_config_immediately=True` as input parameter. We can set this value to False to disable loading CLIP model (if the prompt is in cache and don't need to run CLIP text encoder).
+   - Line 464: load CLIP model conditionally.
+   - Line 485: append a new function to manually load CLIP model.
+6. /ldm/models/diffusion/ddim.py:
+   - Line 121: `device = "cuda"` force the model run in GPU.
+   - Line 171: set all the input values to half precision float16.
+7. /configs/stable-diffusion/myv1-inference.yaml: copy from /configs/stable-diffusion/v1-inference.yaml, append `init_cond_stage_config_immediately: False` to disable automatically load CLIP model.
+
+
 
 ## Citation
     @InProceedings{Rombach_2022_CVPR,

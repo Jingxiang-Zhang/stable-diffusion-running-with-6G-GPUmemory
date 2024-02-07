@@ -118,6 +118,8 @@ class DDIMSampler(object):
                       temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
                       unconditional_guidance_scale=1., unconditional_conditioning=None,):
         device = self.model.betas.device
+        device = "cuda" # by jingxiang zhang
+
         b = shape[0]
         if x_T is None:
             img = torch.randn(shape, device=device)
@@ -166,6 +168,11 @@ class DDIMSampler(object):
     def p_sample_ddim(self, x, c, t, index, repeat_noise=False, use_original_steps=False, quantize_denoised=False,
                       temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
                       unconditional_guidance_scale=1., unconditional_conditioning=None):
+        x = x.half() # by jingxiang zhang
+        c = c.half()
+        t = t.half()
+        unconditional_conditioning = unconditional_conditioning.half()
+
         b, *_, device = *x.shape, x.device
 
         if unconditional_conditioning is None or unconditional_guidance_scale == 1.:

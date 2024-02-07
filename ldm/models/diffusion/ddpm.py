@@ -434,6 +434,7 @@ class LatentDiffusion(DDPM):
                  conditioning_key=None,
                  scale_factor=1.0,
                  scale_by_std=False,
+                 init_cond_stage_config_immediately=True, # by jingxiang zhang
                  *args, **kwargs):
         self.num_timesteps_cond = default(num_timesteps_cond, 1)
         self.scale_by_std = scale_by_std
@@ -458,7 +459,15 @@ class LatentDiffusion(DDPM):
         else:
             self.register_buffer('scale_factor', torch.tensor(scale_factor))
         self.instantiate_first_stage(first_stage_config)
-        self.instantiate_cond_stage(cond_stage_config)
+        # self.instantiate_cond_stage(cond_stage_config)
+        
+        self.cond_stage_config = cond_stage_config # by jingxiang zhang
+        if init_cond_stage_config_immediately:
+            self.load_cond_stage_config = True
+            self.instantiate_cond_stage(cond_stage_config)
+        else:
+            self.load_cond_stage_config = False
+
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
         self.bbox_tokenizer = None  
@@ -472,6 +481,16 @@ class LatentDiffusion(DDPM):
         self.cond_ids = torch.full(size=(self.num_timesteps,), fill_value=self.num_timesteps - 1, dtype=torch.long)
         ids = torch.round(torch.linspace(0, self.num_timesteps - 1, self.num_timesteps_cond)).long()
         self.cond_ids[:self.num_timesteps_cond] = ids
+
+    def init_cond_stage_forward(self): # by jingxiang zhang
+        if not self.load_cond_stage_config:
+            print("load CLIP text encoder")
+            self.instantiate_cond_stage(self.cond_stage_config)
+            self.load_cond_stage_config = True
+            print("loading finished")
+            print("loading CLIP text encoder to cuda")
+            self.cond_stage_model = self.cond_stage_model.to("cuda")
+            print("loading finished")
 
     @rank_zero_only
     @torch.no_grad()

@@ -1,0 +1,8 @@
+# pretrained weight
+models/ldm/stable-diffusion-v1/
+
+# output image
+outputs/
+
+# CLIP cache
+cache/
